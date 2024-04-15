@@ -213,16 +213,8 @@ app.post("/submit_comment", IsAuth, async (req, res) => {
 app.get('/profile', IsAuth, async function (req, res) {
     let user = (await knex('user_profiles')).find(u => u.username == req.user.user);
     const posts = await knex('user_posts').where('username', req.user.user);
-    console.log(posts, " here is the profle route")
     res.render('profile', { footer: true, user, posts })
 })
-
-
-app.get('profileUser', IsAuth, function (req, res) {
-    res.render('userprofile', { footer: true })
-})
-
-
 
 
 // POST REQUEST INSERTING THE DATA INTO  DATABASE TABLE USERS_PROFILES
@@ -377,4 +369,62 @@ app.post('/login', async function (req, res) {
 const PORT = 5000;
 app.listen(PORT, () => {
     console.log(`Server is running on port http://localhost:${PORT}`);
+});
+
+
+app.get('/friends', IsAuth, async function (req, res) {
+    try {
+        // Fetch all users
+        const users = await knex('user_profiles').whereNot('username', req.user.user);
+
+        // Fetch all friendships for the current user
+        const friendships = await knex('friendships')
+            .where('profile_req', req.user.user)
+            .orWhere('profile_accept', req.user.user);
+        // Prepare the data for the template
+        const userData = users.map(user => {
+            const isFollowing = friendships.some(friendship =>
+                (friendship.profile_req === req.user.user && friendship.profile_accept === user.username) ||
+                (friendship.profile_accept === req.user.user && friendship.profile_req === user.username)
+            );
+
+            return { ...user, isFollowing };
+        });
+        // Render the friend.ejs page with the user data
+        res.render('friend', { footer: true, users: userData });
+    } catch (error) {
+        console.error('Error fetching friends:', error);
+        res.status(500).json({ message: 'Server error.' });
+    }
+});
+
+app.post('/follow', IsAuth, async function (req, res) {
+    try {
+        const { username } = req.body;
+        const currentUser = req.user.user;
+
+        // Check if the current user is already following the target user
+        const existingFriendship = await knex('friendships')
+            .where({ profile_req: currentUser, profile_accept: username })
+            .orWhere({ profile_req: username, profile_accept: currentUser })
+            .first();
+
+        if (!existingFriendship) {
+            // Insert a new friendship record
+            await knex('friendships').insert({
+                profile_req: currentUser,
+                profile_accept: username
+            });
+            res.status(200).json({ message: 'Followed successfully.' });
+        } else {
+            await knex('friendships')
+                .where({ profile_req: currentUser, profile_accept: username })
+                .orWhere({ profile_req: username, profile_accept: currentUser })
+                .del();
+            res.status(200).json({ message: 'Unfollowed successfully.' });
+        }
+    } catch (error) {
+        console.error('Error following user:', error);
+        res.status(500).json({ message: 'Server error.' });
+    }
 });

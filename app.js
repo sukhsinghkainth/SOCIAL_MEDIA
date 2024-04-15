@@ -4,10 +4,8 @@ const multer = require('multer')
 const knex = require('knex')(require('./config/knexfile'));
 var path = require('path');
 const cookieParser = require('cookie-parser');
-var router = express.Router();
 const app = express();
 const { v4: uuidv4 } = require('uuid');
-const { error, log } = require('console');
 app.use(cookieParser());
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -192,7 +190,6 @@ app.post("/submit_comment", IsAuth, async (req, res) => {
         const { postId, comment } = req.body;
         const username = req.user.user;
 
-
         // Insert the comment into the database
         await knex('POST_COMMENTS').insert({
             POST_ID: postId,
@@ -201,8 +198,8 @@ app.post("/submit_comment", IsAuth, async (req, res) => {
         });
 
         console.log("Comment submitted successfully:", { postId, comment, username });
-        res.status(200).json({ message: 'Comment submitted successfully.' });
-        window.location.reload();
+        return res.redirect('/feed')
+        
     } catch (error) {
         console.error('Error submitting comment:', error);
         res.status(500).json({ message: 'Server error.' });
@@ -286,7 +283,7 @@ app.post('/post', IsAuth, upload.single('image'), async (req, res) => {
             username: user,
             IMAGE: fileName
         }).returning('post_id')
-        res.status(200).json({ success: true, message: "Post uploaded successfully.", post_id: post_id });
+       res.redirect("/feed")
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: "Server error." });
@@ -319,7 +316,7 @@ app.post('/update', upload.single('image'), async (req, res) => {
         }
         const update = await knex('user_profiles').where('username', username)
             .update(updateData);
-        res.redirect('/edit')
+        res.redirect('/profile')
     } catch (error) {
         console.error(error);
         res.status(500).send('Server error');
@@ -355,7 +352,7 @@ app.post('/login', async function (req, res) {
                 expires: new Date(Date.now() + 3 * 3600 * 1000),
                 httpOnly: true
             })
-            return res.redirect("/feed")
+            return res.redirect("/profile")
         }
     } catch (error) {
         console.log(error);
